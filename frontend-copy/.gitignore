@@ -1,0 +1,62 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Системные файлы macOS
+.DS_Store
+.Trash/
+*.localized
+
+# Временные файлы и кэши
+*.log
+*.cache
+*.tmp
+*.swp
+
+# Зависимости и сборки
+node_modules/
+dist/
+build/
+.parcel-cache/
+.next/
+out/
+
+# Конфигурационные файлы
+.env
+.env.local
+.env.development
+.env.production
+
+# Файлы IDE и редакторов
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Локальные файлы разработки
+*.bak
+*.orig
+
+# Игнорировать родительские директории
+../*
+../../*
