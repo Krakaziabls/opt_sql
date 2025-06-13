@@ -1,5 +1,21 @@
 package com.example.backend.service;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.exception.DatabaseConnectionException;
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.model.dto.DatabaseConnectionDto;
@@ -10,18 +26,9 @@ import com.example.backend.repository.ChatRepository;
 import com.example.backend.repository.DatabaseConnectionRepository;
 import com.example.backend.repository.UserRepository;
 import com.example.sqlopt.service.ASTService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.sql.*;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -73,9 +80,29 @@ public class DatabaseConnectionService {
     public boolean testConnection(DatabaseConnectionDto connectionDto) {
         String url = buildJdbcUrl(connectionDto);
 
-        try (Connection connection = DriverManager.getConnection(
-                url, connectionDto.getUsername(), connectionDto.getPassword())) {
-            return connection.isValid(5);
+        try {
+            // Загружаем драйвер
+            Class.forName("org.postgresql.Driver");
+            
+            // Пробуем подключиться с таймаутом
+            try (Connection connection = DriverManager.getConnection(
+                    url, connectionDto.getUsername(), connectionDto.getPassword())) {
+                
+                // Проверяем валидность соединения
+                if (!connection.isValid(5)) {
+                    throw new DatabaseConnectionException("Connection is not valid");
+                }
+                
+                // Пробуем выполнить простой запрос
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.executeQuery("SELECT 1");
+                }
+                
+                return true;
+            }
+        } catch (ClassNotFoundException e) {
+            log.error("PostgreSQL driver not found: {}", e.getMessage());
+            throw new DatabaseConnectionException("PostgreSQL driver not found");
         } catch (SQLException e) {
             log.error("Failed to connect to database: {}", e.getMessage());
             throw new DatabaseConnectionException("Failed to connect to database: " + e.getMessage());

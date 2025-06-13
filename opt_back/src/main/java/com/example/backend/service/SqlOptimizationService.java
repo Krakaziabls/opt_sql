@@ -1,19 +1,19 @@
 package com.example.backend.service;
 
+import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.io.StringReader;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,6 @@ import com.example.backend.repository.MessageRepository;
 import com.example.backend.repository.SqlQueryRepository;
 import com.example.sqlopt.ast.QueryPlanResult;
 import com.example.sqlopt.service.ASTService;
-import com.google.gson.Gson;
 
 import lombok.RequiredArgsConstructor;
 import net.sf.jsqlparser.JSQLParserException;
@@ -387,6 +386,7 @@ public class SqlOptimizationService {
                             .content(req.getQuery())
                             .fromUser(true)
                             .createdAt(LocalDateTime.now())
+                            .llmProvider(req.getLlm())
                             .build();
 
                     // Создаем запись SQL-запроса
@@ -535,6 +535,7 @@ public class SqlOptimizationService {
                             .content(formattedResponse)
                             .fromUser(false)
                             .createdAt(LocalDateTime.now())
+                            .llmProvider(request.getLlm())
                             .build();
                         llmMessage = messageRepository.save(llmMessage);
 
@@ -544,7 +545,8 @@ public class SqlOptimizationService {
                             .content(formattedResponse)
                             .fromUser(false)
                             .createdAt(llmMessage.getCreatedAt())
-                            .chatId(request.getChatId())
+                            .chatId(String.valueOf(request.getChatId()))
+                            .llmProvider(request.getLlm())
                             .build();
                         messagingTemplate.convertAndSend(destination, messageDto);
                         log.info("Successfully sent message to {}: id={}", destination, llmMessage.getId());
@@ -680,7 +682,8 @@ public class SqlOptimizationService {
                 .content(message.getContent())
                 .fromUser(message.isFromUser())
                 .createdAt(message.getCreatedAt())
-                .chatId(message.getChat().getId())
+                .chatId(String.valueOf(message.getChat().getId()))
+                .llmProvider(message.getLlmProvider())
                 .build();
     }
 

@@ -158,7 +158,19 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                         setLocalMessages(prev => prev.filter(m => m.id !== tempId));
                     }
 
-                    setLocalMessages(prev => [...prev, newMessage]);
+                    setLocalMessages(prev => {
+                        const updatedMessages = [...prev];
+                        const existingIndex = updatedMessages.findIndex(m => m.id === newMessage.id);
+                        
+                        if (existingIndex !== -1) {
+                            updatedMessages[existingIndex] = newMessage;
+                        } else {
+                            updatedMessages.push(newMessage);
+                        }
+                        
+                        return updatedMessages;
+                    });
+
                     setTimeout(() => {
                         scrollToBottom();
                     }, 100);
@@ -246,7 +258,7 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
         }
 
         // Проверяем, является ли сообщение ответом на SQL-запрос
-        if (message.content.includes('## Информация о запросе')) {
+        if (message.content.includes('## Оптимизированный SQL') || message.content.includes('## Информация о запросе')) {
             try {
                 const parsedResponse = parseLLMResponse(message.content);
                 
@@ -273,6 +285,40 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                     }
                 }
 
+                // Проверяем, является ли ответ от GigaChat
+                if (message.content.includes('## Оптимизированный SQL')) {
+                    return (
+                        <div className="bg-gray-800 text-white rounded-lg p-3 max-w-[80%]">
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                                components={{
+                                    code: ({node, inline, className, children, ...props}: CodeProps) => {
+                                        const match = /language-(\w+)/.exec(className || '');
+                                        return !inline && match ? (
+                                            <SyntaxHighlighter
+                                                style={vscDarkPlus as any}
+                                                language={match[1]}
+                                                PreTag="div"
+                                                {...props}
+                                            >
+                                                {String(children).replace(/\n$/, '')}
+                                            </SyntaxHighlighter>
+                                        ) : (
+                                            <code className={className} {...props}>
+                                                {children}
+                                            </code>
+                                        );
+                                    }
+                                }}
+                            >
+                                {message.content}
+                            </ReactMarkdown>
+                        </div>
+                    );
+                }
+
+                // Для локальной модели используем полный вывод
                 return (
                     <OptimizedSQLResponse
                         originalQuery={parsedResponse.originalQuery}

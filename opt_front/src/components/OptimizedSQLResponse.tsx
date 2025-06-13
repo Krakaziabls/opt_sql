@@ -336,323 +336,61 @@ export const OptimizedSQLResponse: React.FC<OptimizedSQLResponseProps> = ({
     };
 
     return (
-        <div className={cn("space-y-4 w-full", className)}>
-            {/* Индикатор подключения к БД */}
-            {hasDatabaseConnection && (
-                <div className="flex items-center space-x-2 mb-4 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-gray-400">Подключено к базе данных</span>
-                </div>
-            )}
-
-            {/* Сравнение запросов - всегда видимое */}
-            <div className="bg-gray-900 rounded-lg p-4">
-                <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Info className="text-blue-400 mr-2" />
-                    Сравнение запросов
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-sm font-medium text-gray-400">Исходный запрос</h4>
-                            <button
-                                onClick={() => copyToClipboard(originalQuery, 'original')}
-                                className="p-1 hover:bg-gray-700 rounded transition-colors duration-200"
-                                title="Копировать запрос"
-                            >
-                                {copiedStates.original ? (
-                                    <Check className="w-4 h-4 text-green-400" />
-                                ) : (
-                                    <Copy className="w-4 h-4 text-gray-400" />
-                                )}
-                            </button>
-                        </div>
+        <div className={cn("bg-gray-900 rounded-lg overflow-hidden", className)}>
+            <div className="p-4">
+                <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Оптимизированный SQL</h3>
+                    <div className="relative">
                         <SyntaxHighlighter
                             language="sql"
                             style={vscDarkPlus}
-                            customStyle={{ margin: 0, borderRadius: '0.375rem' }}
-                        >
-                            {originalQuery}
-                        </SyntaxHighlighter>
-                    </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-sm font-medium text-gray-400">Оптимизированный запрос</h4>
-                            <button
-                                onClick={() => copyToClipboard(optimizedQuery, 'optimized')}
-                                className="p-1 hover:bg-gray-700 rounded transition-colors duration-200"
-                                title="Копировать запрос"
-                            >
-                                {copiedStates.optimized ? (
-                                    <Check className="w-4 h-4 text-green-400" />
-                                ) : (
-                                    <Copy className="w-4 h-4 text-gray-400" />
-                                )}
-                            </button>
-                        </div>
-                        <SyntaxHighlighter
-                            language="sql"
-                            style={vscDarkPlus}
-                            customStyle={{ margin: 0, borderRadius: '0.375rem' }}
+                            className="rounded-lg"
                         >
                             {optimizedQuery}
                         </SyntaxHighlighter>
+                        <button
+                            onClick={() => copyToClipboard(optimizedQuery, 'optimized')}
+                            className="absolute top-2 right-2 p-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
+                        >
+                            {copiedStates.optimized ? (
+                                <Check className="w-4 h-4 text-green-400" />
+                            ) : (
+                                <Copy className="w-4 h-4" />
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <h3 className="text-lg font-semibold mb-2">Пояснение</h3>
+                    <div className="prose prose-invert max-w-none">
+                        <ReactMarkdown
+                            rehypePlugins={[rehypeSanitize]}
+                            components={{
+                                code: ({ node, inline, className, children, ...props }) => {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    return !inline && match ? (
+                                        <SyntaxHighlighter
+                                            style={vscDarkPlus}
+                                            language={match[1]}
+                                            PreTag="div"
+                                            {...props}
+                                        >
+                                            {String(children).replace(/\n$/, '')}
+                                        </SyntaxHighlighter>
+                                    ) : (
+                                        <code className={className} {...props}>
+                                            {children}
+                                        </code>
+                                    );
+                                }
+                            }}
+                        >
+                            {optimizationRationale}
+                        </ReactMarkdown>
                     </div>
                 </div>
             </div>
-
-            {/* Планы выполнения */}
-            <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <button
-                    onClick={() => toggleSection('plans')}
-                    className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <BarChart2 className="w-5 h-5 text-blue-400" />
-                        <h3 className="text-lg font-semibold">Планы выполнения</h3>
-                    </div>
-                    {expandedSections.plans ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </button>
-                
-                <AnimatePresence>
-                    {expandedSections.plans && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="p-4 space-y-4">
-                                {/* План исходного запроса */}
-                                <div>
-                                    <h4 className="text-md font-medium mb-2 text-gray-300">План исходного запроса</h4>
-                                    {originalPlan ? renderPlan(originalPlan) : (
-                                        <div className="text-gray-500">Нет данных о плане выполнения</div>
-                                    )}
-                                </div>
-
-                                {/* План оптимизированного запроса */}
-                                <div>
-                                    <h4 className="text-md font-medium mb-2 text-gray-300">План оптимизированного запроса</h4>
-                                    {optimizedPlan ? renderPlan(optimizedPlan) : (
-                                        <div className="text-gray-500">Нет данных о плане выполнения</div>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Метрики выполнения */}
-            {hasDatabaseConnection && executionMetrics && (
-                <div className="bg-gray-900 rounded-lg p-4">
-                    <h3 className="text-lg font-medium mb-4 flex items-center">
-                        <Clock className="text-green-400 mr-2" />
-                        Метрики выполнения
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-gray-800 p-4 rounded-lg">
-                            <div className="text-sm text-gray-400">Исходное время</div>
-                            <div className="text-2xl font-semibold text-white">{executionMetrics.originalTime.toFixed(2)} мс</div>
-                        </div>
-                        <div className="bg-gray-800 p-4 rounded-lg">
-                            <div className="text-sm text-gray-400">Оптимизированное время</div>
-                            <div className="text-2xl font-semibold text-white">{executionMetrics.optimizedTime.toFixed(2)} мс</div>
-                        </div>
-                        <div className="bg-gray-800 p-4 rounded-lg">
-                            <div className="text-sm text-gray-400">Улучшение</div>
-                            <div className="text-2xl font-semibold text-green-400">{executionMetrics.improvement.toFixed(1)}%</div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Рационализация оптимизации */}
-            <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <button
-                    onClick={() => toggleSection('rationale')}
-                    className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <Info className="w-5 h-5 text-blue-400" />
-                        <h3 className="text-lg font-semibold">Рационализация оптимизации</h3>
-                    </div>
-                    {expandedSections.rationale ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </button>
-                
-                <AnimatePresence>
-                    {expandedSections.rationale && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="p-4">
-                                <ReactMarkdown
-                                    rehypePlugins={[rehypeSanitize]}
-                                    components={{
-                                        div: ({ node, ...props }) => <div className="prose prose-invert max-w-none" {...props} />
-                                    }}
-                                >
-                                    {optimizationRationale}
-                                </ReactMarkdown>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Влияние на производительность */}
-            <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <button
-                    onClick={() => toggleSection('impact')}
-                    className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <BarChart2 className="w-5 h-5 text-green-400" />
-                        <h3 className="text-lg font-semibold">Влияние на производительность</h3>
-                    </div>
-                    {expandedSections.impact ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </button>
-                
-                <AnimatePresence>
-                    {expandedSections.impact && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="p-4">
-                                <ReactMarkdown
-                                    rehypePlugins={[rehypeSanitize]}
-                                    components={{
-                                        div: ({ node, ...props }) => <div className="prose prose-invert max-w-none" {...props} />
-                                    }}
-                                >
-                                    {performanceImpact}
-                                </ReactMarkdown>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Потенциальные риски */}
-            <div className="bg-gray-900 rounded-lg overflow-hidden">
-                <button
-                    onClick={() => toggleSection('risks')}
-                    className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-lg font-semibold">Потенциальные риски</h3>
-                    </div>
-                    {expandedSections.risks ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                </button>
-                
-                <AnimatePresence>
-                    {expandedSections.risks && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="p-4">
-                                <ReactMarkdown
-                                    rehypePlugins={[rehypeSanitize]}
-                                    components={{
-                                        div: ({ node, ...props }) => <div className="prose prose-invert max-w-none" {...props} />
-                                    }}
-                                >
-                                    {potentialRisks}
-                                </ReactMarkdown>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Метаданные таблиц */}
-            {hasDatabaseConnection && tablesMetadata && Object.keys(tablesMetadata).length > 0 && (
-                <div className="bg-gray-900 rounded-lg overflow-hidden">
-                    <button
-                        onClick={() => toggleSection('metadata')}
-                        className="flex items-center justify-between w-full p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Table className="w-5 h-5 text-blue-400" />
-                            <h3 className="text-lg font-semibold">Метаданные таблиц</h3>
-                        </div>
-                        {expandedSections.metadata ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </button>
-                    
-                    <AnimatePresence>
-                        {expandedSections.metadata && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="p-4 space-y-4">
-                                    {Object.entries(tablesMetadata).map(([tableName, metadata]) => (
-                                        <div key={tableName} className="bg-gray-800 rounded-lg p-4">
-                                            <h4 className="text-sm font-medium text-gray-300 mb-3">{tableName}</h4>
-                                            
-                                            {/* Колонки */}
-                                            {metadata.columns && metadata.columns.length > 0 && (
-                                                <div className="mb-4">
-                                                    <h5 className="text-xs font-medium text-gray-400 mb-2">Колонки</h5>
-                                                    <div className="grid grid-cols-4 gap-2 text-xs">
-                                                        {metadata.columns.map((column: any) => (
-                                                            <div key={column.name} className="bg-gray-700 p-2 rounded">
-                                                                <div className="font-medium text-gray-300">{column.name}</div>
-                                                                <div className="text-gray-400">{column.type}</div>
-                                                                {column.nullable !== undefined && (
-                                                                    <div className="text-gray-500">
-                                                                        {column.nullable ? 'NULL' : 'NOT NULL'}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            {/* Индексы */}
-                                            {metadata.indexes && metadata.indexes.length > 0 && (
-                                                <div>
-                                                    <h5 className="text-xs font-medium text-gray-400 mb-2">Индексы</h5>
-                                                    <div className="space-y-2">
-                                                        {metadata.indexes.map((index: any, idx: number) => (
-                                                            <div key={idx} className="bg-gray-700 p-2 rounded text-xs">
-                                                                <div className="font-medium text-gray-300">{index.name}</div>
-                                                                <div className="text-gray-400">Колонки: {index.columns}</div>
-                                                                {index.unique && (
-                                                                    <div className="text-green-400">Уникальный</div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            )}
         </div>
     );
 };

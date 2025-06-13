@@ -1,16 +1,18 @@
 package com.example.backend.service;
 
-import com.example.backend.model.dto.MessageDto;
-import com.example.backend.model.entity.Chat;
-import com.example.backend.model.entity.Message;
-import com.example.backend.repository.MessageRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import com.example.backend.model.dto.MessageDto;
+import com.example.backend.model.entity.Chat;
+import com.example.backend.model.entity.Message;
+import com.example.backend.repository.MessageRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -33,19 +35,22 @@ public class MessageService {
 
         // Отправляем сообщение через WebSocket
         String destination = "/topic/chat/" + chat.getId();
+        MessageDto messageDto = mapToMessageDto(message);
         log.debug("Sending message to destination: {}", destination);
-        messagingTemplate.convertAndSend(destination, message);
+        messagingTemplate.convertAndSend(destination, messageDto);
         log.info("Successfully sent message to {}: id={}", destination, message.getId());
 
-        return mapToMessageDto(message);
+        return messageDto;
     }
 
     private MessageDto mapToMessageDto(Message message) {
         return MessageDto.builder()
                 .id(message.getId())
+                .chatId(String.valueOf(message.getChat().getId()))
                 .content(message.getContent())
                 .fromUser(message.isFromUser())
                 .createdAt(message.getCreatedAt())
+                .llmProvider(message.getLlmProvider())
                 .build();
     }
 }

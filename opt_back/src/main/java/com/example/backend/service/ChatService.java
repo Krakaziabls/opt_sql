@@ -1,5 +1,14 @@
 package com.example.backend.service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.backend.exception.ResourceNotFoundException;
 import com.example.backend.model.dto.ChatDto;
 import com.example.backend.model.dto.MessageDto;
@@ -10,16 +19,9 @@ import com.example.backend.model.entity.User;
 import com.example.backend.repository.ChatRepository;
 import com.example.backend.repository.MessageRepository;
 import com.example.backend.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -123,6 +125,7 @@ public class ChatService {
                         optimizedMessage.setContent(response.getOptimizedQuery());
                         optimizedMessage.setFromUser(false);
                         optimizedMessage.setCreatedAt(LocalDateTime.now());
+                        optimizedMessage.setLlmProvider(request.getLlm());
                         messageRepository.save(optimizedMessage);
 
                         String destination = "/topic/chat/" + chatId;

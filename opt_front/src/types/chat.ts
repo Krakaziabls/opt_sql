@@ -3,6 +3,7 @@ export interface Message {
     content: string;
     type: 'user' | 'assistant' | 'error';
     timestamp: string;
+    llmProvider?: string;
 }
 
 export interface Chat {
