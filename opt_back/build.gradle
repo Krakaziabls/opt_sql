@@ -1,0 +1,92 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.3'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+    id 'org.flywaydb.flyway' version '9.22.3'
+}
+
+group = 'com.example.backend'
+version = '0.1.0'
+description = 'SQL Optimizer with LLM'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    springdocVersion = '2.3.0'
+    jjwtVersion = '0.12.3'
+    jsqlparserVersion = '4.5'
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Database
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'com.zaxxer:HikariCP'
+
+    // JWT
+    implementation "io.jsonwebtoken:jjwt-api:$jjwtVersion"
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:$jjwtVersion"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:$jjwtVersion"
+
+    // SQL Parser
+    implementation "com.github.jsqlparser:jsqlparser:$jsqlparserVersion"
+
+    // Swagger/OpenAPI
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:$springdocVersion"
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-api:$springdocVersion"
+
+    // Jakarta EE
+    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    implementation 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+
+    // Utilities
+    compileOnly 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    implementation 'org.apache.commons:commons-lang3'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'com.h2database:h2'
+
+    // Netty DNS
+    implementation 'io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64'
+
+    // Hibernate Types
+    implementation 'com.vladmihalcea:hibernate-types-60:2.21.1'
+}
+
+tasks.named('bootJar') {
+    archiveFileName = 'backend.jar'
+    enabled = true
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+flyway {
+    url = 'jdbc:postgresql://localhost:5432/sql_optimizer'
+    user = 'postgres'
+    password = 'postgres'
+    locations = ['classpath:db/migration']
+}
