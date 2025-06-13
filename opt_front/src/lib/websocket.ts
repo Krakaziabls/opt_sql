@@ -1,5 +1,6 @@
 import { Client, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { config } from '../config';
 
 export class WebSocketClient {
     private client: Client;
@@ -9,16 +10,18 @@ export class WebSocketClient {
 
     constructor(chatId: string) {
         this.client = new Client({
-            webSocketFactory: () => new SockJS('/ws'),
+            webSocketFactory: () => new SockJS(config.websocketUrl),
             connectHeaders: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             debug: (str) => {
-                console.log(str);
+                if (config.debug) {
+                    console.log('STOMP: ' + str);
+                }
             },
-            reconnectDelay: 5000,
-            heartbeatIncoming: 4000,
-            heartbeatOutgoing: 4000,
+            reconnectDelay: config.reconnectDelay,
+            heartbeatIncoming: config.heartbeatInterval,
+            heartbeatOutgoing: config.heartbeatInterval,
         });
 
         this.client.onConnect = () => {
@@ -33,7 +36,13 @@ export class WebSocketClient {
         };
 
         this.client.onStompError = (frame) => {
+            console.error('STOMP error:', frame);
             this.errorHandlers.forEach(handler => handler(frame));
+        };
+
+        this.client.onWebSocketError = (event) => {
+            console.error('WebSocket error:', event);
+            this.errorHandlers.forEach(handler => handler(event));
         };
 
         this.client.activate();

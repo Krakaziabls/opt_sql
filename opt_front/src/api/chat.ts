@@ -6,6 +6,7 @@ export interface Message {
     content: string;
     fromUser: boolean;
     createdAt: string;
+    llmProvider?: string;
 }
 
 export interface Chat {

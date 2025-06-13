@@ -56,7 +56,32 @@ public class LLMService {
         }
 
         try {
-            Map<String, Object> requestBody = prepareRequestBody(query, promptTemplate);
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", "local-model");
+
+            List<Map<String, String>> messages = new ArrayList<>();
+            
+            // Системный промпт с четкими инструкциями
+            String systemPrompt = "Ты - эксперт по оптимизации SQL-запросов. Твоя задача - проанализировать SQL-запрос и предложить его оптимизированную версию. " +
+                    "Твой ответ должен быть в следующем формате:\n\n" +
+                    "## Оптимизированный SQL\n\n" +
+                    "```sql\n" +
+                    "[оптимизированный запрос]\n" +
+                    "```\n\n" +
+                    "## Пояснение\n\n" +
+                    "[подробное объяснение оптимизаций]\n\n" +
+                    "## Оценка улучшения\n\n" +
+                    "[оценка производительности]\n\n" +
+                    "## Потенциальные риски\n\n" +
+                    "[описание возможных рисков]";
+            
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+            messages.add(Map.of("role", "user", "content", "Оптимизируй следующий SQL-запрос:\n\n" + query));
+
+            requestBody.put("messages", messages);
+            requestBody.put("temperature", 0.7);
+            requestBody.put("max_tokens", 2048);
+
             log.debug("Prepared request body for local LLM: {}", requestBody);
 
             return Mono.fromCallable(() -> {
@@ -81,8 +106,7 @@ public class LLMService {
                         JsonNode messageNode = firstChoice.path("message");
                         String content = messageNode.path("content").asText();
 
-                        // Форматируем ответ в соответствии с шаблоном
-                        return formatLocalLLMResponse(content);
+                        return content;
                     }
 
                     log.error("Invalid response format from local LLM: {}", response);
@@ -104,10 +128,10 @@ public class LLMService {
 
     private String formatLocalLLMResponse(String content) {
         // Если ответ уже содержит нужный формат, возвращаем его как есть
-        if (content.contains("Оптимизированный SQL-запрос") &&
-                (content.contains("Обоснование оптимизации") || content.contains("Обоснование изменений")) &&
-                content.contains("Оценка улучшения") &&
-                content.contains("Потенциальные риски")) {
+        if (content.contains("## Оптимизированный SQL") && 
+            content.contains("## Пояснение") && 
+            content.contains("## Оценка улучшения") && 
+            content.contains("## Потенциальные риски")) {
             return content;
         }
 
@@ -115,11 +139,7 @@ public class LLMService {
         StringBuilder formattedResponse = new StringBuilder();
 
         // Добавляем SQL запрос
-        formattedResponse.append("## Информация о запросе\n\n");
-        formattedResponse.append("### Сравнение запросов\n\n");
-        
-        // Исходный запрос
-        formattedResponse.append("#### Исходный запрос\n");
+        formattedResponse.append("## Оптимизированный SQL\n\n");
         if (content.contains("```sql")) {
             int start = content.indexOf("```sql") + 6;
             int end = content.indexOf("```", start);
@@ -134,28 +154,23 @@ public class LLMService {
             formattedResponse.append("\n```\n\n");
         }
 
-        // Оптимизированный запрос
-        formattedResponse.append("#### Оптимизированный запрос\n");
-        if (content.contains("```sql")) {
-            int start = content.indexOf("```sql") + 6;
-            int end = content.indexOf("```", start);
+        // Добавляем пояснение
+        formattedResponse.append("## Пояснение\n\n");
+        if (content.contains("Пояснение:")) {
+            int start = content.indexOf("Пояснение:") + 11;
+            int end = content.indexOf("##", start);
             if (end > start) {
-                formattedResponse.append("```sql\n");
                 formattedResponse.append(content.substring(start, end).trim());
-                formattedResponse.append("\n```\n\n");
+            } else {
+                formattedResponse.append(content.substring(start).trim());
             }
         } else {
-            formattedResponse.append("```sql\n");
-            formattedResponse.append(content.trim());
-            formattedResponse.append("\n```\n\n");
+            formattedResponse.append("В данном запросе были применены следующие оптимизации:\n\n");
+            formattedResponse.append("1. Анализ и улучшение структуры запроса\n");
+            formattedResponse.append("2. Оптимизация условий WHERE\n");
+            formattedResponse.append("3. Улучшение использования индексов\n");
         }
-
-        // Добавляем обоснование оптимизации
-        formattedResponse.append("## Обоснование оптимизации\n\n");
-        formattedResponse.append("В данном запросе были применены следующие оптимизации:\n\n");
-        formattedResponse.append("1. Анализ и улучшение структуры запроса\n");
-        formattedResponse.append("2. Оптимизация условий WHERE\n");
-        formattedResponse.append("3. Улучшение использования индексов\n\n");
+        formattedResponse.append("\n\n");
 
         // Добавляем оценку улучшения
         formattedResponse.append("## Оценка улучшения\n\n");
@@ -198,6 +213,7 @@ public class LLMService {
                             .onStatus(status -> status.is5xxServerError(),
                                     clientResponse -> handleServerError(clientResponse))
                             .bodyToMono(String.class))
+                    .doOnNext(response -> log.debug("Full response from GigaChat: {}", response))
                     .flatMap(this::parseResponse)
                     .retryWhen(Retry.backoff(MAX_RETRY_ATTEMPTS, Duration.ofMillis(RETRY_DELAY_MS))
                             .doBeforeRetry(
@@ -233,8 +249,23 @@ public class LLMService {
         requestBody.put("model", llmConfig.getModel());
 
         List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptTemplate));
-        messages.add(Map.of("role", "user", "content", query));
+        
+        // Системный промпт с четкими инструкциями
+        String systemPrompt = "Ты - эксперт по оптимизации SQL-запросов. Твоя задача - проанализировать SQL-запрос и предложить его оптимизированную версию. " +
+                "Твой ответ должен быть в следующем формате:\n\n" +
+                "## Оптимизированный SQL\n\n" +
+                "```sql\n" +
+                "[оптимизированный запрос]\n" +
+                "```\n\n" +
+                "## Пояснение\n\n" +
+                "[подробное объяснение оптимизаций]\n\n" +
+                "## Оценка улучшения\n\n" +
+                "[оценка производительности]\n\n" +
+                "## Потенциальные риски\n\n" +
+                "[описание возможных рисков]";
+        
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        messages.add(Map.of("role", "user", "content", "Оптимизируй следующий SQL-запрос:\n\n" + query));
 
         requestBody.put("messages", messages);
         requestBody.put("temperature", llmConfig.getTemperature());
@@ -277,6 +308,10 @@ public class LLMService {
                 if (message != null) {
                     String content = message.get("content").asText();
                     if (content != null && !content.trim().isEmpty()) {
+                        if (content.trim().startsWith("{")) {
+                            log.error("Response is not a SQL query: {}", content);
+                            return Mono.error(new ApiException("Response is not a SQL query", HttpStatus.INTERNAL_SERVER_ERROR));
+                        }
                         return Mono.just(formatGigaChatResponse(content));
                     }
                 }
@@ -290,7 +325,10 @@ public class LLMService {
 
     private String formatGigaChatResponse(String content) {
         // Если ответ уже содержит нужный формат, возвращаем его как есть
-        if (content.contains("Оптимизированный SQL:") && content.contains("Пояснение:")) {
+        if (content.contains("## Оптимизированный SQL") && 
+            content.contains("## Пояснение") && 
+            content.contains("## Оценка улучшения") && 
+            content.contains("## Потенциальные риски")) {
             return content;
         }
 
@@ -315,10 +353,35 @@ public class LLMService {
 
         // Добавляем пояснение
         formattedResponse.append("## Пояснение\n\n");
-        formattedResponse.append("В данном запросе были применены следующие оптимизации:\n\n");
-        formattedResponse.append("1. Анализ и улучшение структуры запроса\n");
-        formattedResponse.append("2. Оптимизация условий WHERE\n");
-        formattedResponse.append("3. Улучшение использования индексов\n");
+        if (content.contains("Пояснение:")) {
+            int start = content.indexOf("Пояснение:") + 11;
+            int end = content.indexOf("##", start);
+            if (end > start) {
+                formattedResponse.append(content.substring(start, end).trim());
+            } else {
+                formattedResponse.append(content.substring(start).trim());
+            }
+        } else {
+            formattedResponse.append("В данном запросе были применены следующие оптимизации:\n\n");
+            formattedResponse.append("1. Анализ и улучшение структуры запроса\n");
+            formattedResponse.append("2. Оптимизация условий WHERE\n");
+            formattedResponse.append("3. Улучшение использования индексов\n");
+        }
+        formattedResponse.append("\n\n");
+
+        // Добавляем оценку улучшения
+        formattedResponse.append("## Оценка улучшения\n\n");
+        formattedResponse.append("Ожидаемые улучшения производительности:\n\n");
+        formattedResponse.append("1. Уменьшение времени выполнения запроса\n");
+        formattedResponse.append("2. Снижение нагрузки на базу данных\n");
+        formattedResponse.append("3. Более эффективное использование ресурсов\n\n");
+
+        // Добавляем потенциальные риски
+        formattedResponse.append("## Потенциальные риски\n\n");
+        formattedResponse.append("При применении оптимизаций следует учитывать следующие риски:\n\n");
+        formattedResponse.append("1. Возможные изменения в логике работы запроса\n");
+        formattedResponse.append("2. Необходимость тестирования на реальных данных\n");
+        formattedResponse.append("3. Влияние на другие части системы\n");
 
         return formattedResponse.toString();
     }

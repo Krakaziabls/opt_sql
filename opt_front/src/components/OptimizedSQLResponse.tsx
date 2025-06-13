@@ -19,6 +19,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
+import { CSSProperties } from 'react';
 
 ChartJS.register(
     CategoryScale,
@@ -54,6 +57,14 @@ interface TableMetadataInfo {
     };
 }
 
+type CodeComponent = Components['code'];
+
+interface CodeBlockProps {
+    inline?: boolean;
+    className?: string;
+    children: React.ReactNode;
+}
+
 interface OptimizedSQLResponseProps {
     originalQuery: string;
     optimizedQuery: string;
@@ -71,6 +82,25 @@ interface OptimizedSQLResponseProps {
     hasDatabaseConnection: boolean;
     tablesMetadata: Record<string, any> | null;
 }
+
+const components: Components = {
+    code: ({ className, children }) => {
+        const match = /language-(\w+)/.exec(className || '');
+        return match ? (
+            <SyntaxHighlighter
+                style={vscDarkPlus as any}
+                language={match[1]}
+                PreTag="div"
+            >
+                {String(children).replace(/\n$/, '')}
+            </SyntaxHighlighter>
+        ) : (
+            <code className={className}>
+                {children}
+            </code>
+        );
+    }
+};
 
 export const OptimizedSQLResponse: React.FC<OptimizedSQLResponseProps> = ({
     originalQuery,
@@ -366,25 +396,7 @@ export const OptimizedSQLResponse: React.FC<OptimizedSQLResponseProps> = ({
                     <div className="prose prose-invert max-w-none">
                         <ReactMarkdown
                             rehypePlugins={[rehypeSanitize]}
-                            components={{
-                                code: ({ node, inline, className, children, ...props }) => {
-                                    const match = /language-(\w+)/.exec(className || '');
-                                    return !inline && match ? (
-                                        <SyntaxHighlighter
-                                            style={vscDarkPlus}
-                                            language={match[1]}
-                                            PreTag="div"
-                                            {...props}
-                                        >
-                                            {String(children).replace(/\n$/, '')}
-                                        </SyntaxHighlighter>
-                                    ) : (
-                                        <code className={className} {...props}>
-                                            {children}
-                                        </code>
-                                    );
-                                }
-                            }}
+                            components={components}
                         >
                             {optimizationRationale}
                         </ReactMarkdown>

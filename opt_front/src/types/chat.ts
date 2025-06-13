@@ -4,6 +4,9 @@ export interface Message {
     type: 'user' | 'assistant' | 'error';
     timestamp: string;
     llmProvider?: string;
+    fromUser?: boolean;
+    createdAt?: string;
+    chatId?: string;
 }
 
 export interface Chat {

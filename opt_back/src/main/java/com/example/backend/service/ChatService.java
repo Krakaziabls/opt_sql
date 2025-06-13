@@ -115,7 +115,7 @@ public class ChatService {
                 SqlQueryRequest request = new SqlQueryRequest();
                 request.setChatId(chatId);
                 request.setQuery(messageDto.getContent());
-                request.setLlm("gpt-4");
+                request.setLlm(messageDto.getLlmProvider());
                 request.setMPP(false);
 
                 sqlOptimizationService.optimizeQuery(userId, request)
@@ -125,7 +125,7 @@ public class ChatService {
                         optimizedMessage.setContent(response.getOptimizedQuery());
                         optimizedMessage.setFromUser(false);
                         optimizedMessage.setCreatedAt(LocalDateTime.now());
-                        optimizedMessage.setLlmProvider(request.getLlm());
+                        optimizedMessage.setLlmProvider(messageDto.getLlmProvider());
                         messageRepository.save(optimizedMessage);
 
                         String destination = "/topic/chat/" + chatId;
