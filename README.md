@@ -109,7 +109,6 @@ REACT_APP_API_URL=http://localhost:8080
 
 ### SQL Оптимизация
 - POST `/sql/optimize` - Оптимизация SQL-запроса
-- GET `/sql/history` - История оптимизаций
 
 ### WebSocket
 - `/ws` - WebSocket endpoint для real-time обновлений
@@ -120,7 +119,7 @@ REACT_APP_API_URL=http://localhost:8080
 
 ```bash
 cd opt_back
-./mvnw spring-boot:run
+./gradlew bootRun
 ```
 
 ### Frontend
