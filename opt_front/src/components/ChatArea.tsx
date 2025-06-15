@@ -147,12 +147,8 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
             const subscription = client.subscribe(`/topic/chat/${selectedChatId}`, (message) => {
                 try {
                     const newMessage: Message = JSON.parse(message.body);
-                    console.log('Received WebSocket message:', newMessage);
 
-                    if (processedMessageIds.current.has(newMessage.id)) {
-                        console.log('Message already processed:', newMessage.id);
-                        return;
-                    }
+                    if (processedMessageIds.current.has(newMessage.id)) return;
 
                     processedMessageIds.current.add(newMessage.id);
 
@@ -162,28 +158,12 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                         setLocalMessages(prev => prev.filter(m => m.id !== tempId));
                     }
 
-                    setLocalMessages(prev => {
-                        const updatedMessages = [...prev];
-                        const existingIndex = updatedMessages.findIndex(m => m.id === newMessage.id);
-                        
-                        if (existingIndex !== -1) {
-                            console.log('Updating existing message:', newMessage.id);
-                            updatedMessages[existingIndex] = newMessage;
-                        } else {
-                            console.log('Adding new message:', newMessage.id);
-                            updatedMessages.push(newMessage);
-                        }
-                        
-                        return updatedMessages;
-                    });
-
+                    setLocalMessages(prev => [...prev, newMessage]);
                     setTimeout(() => {
-                        setLocalMessages(prev => [...prev]);
                         scrollToBottom();
                     }, 100);
                 } catch (err) {
-                    console.error('Error processing WebSocket message:', err);
-                    setError('Error processing message: ' + (err instanceof Error ? err.message : 'Unknown error'));
+                    console.error('Error processing message:', err);
                 }
             });
 
@@ -192,12 +172,10 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
         };
 
         client.onStompError = (error) => {
-            console.error('STOMP error:', error);
             setError('WebSocket error: ' + error.headers.message);
         };
 
-        client.onWebSocketError = (event) => {
-            console.error('WebSocket error:', event);
+        client.onWebSocketError = () => {
             setError('WebSocket connection error');
         };
 
@@ -206,7 +184,6 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
         return () => {
             if (wsClient.current?.active) {
                 wsClient.current.subscription?.unsubscribe();
-                wsClient.current.deactivate();
             }
         };
     }, [selectedChatId, scrollToBottom, isSQLQuery]);
@@ -228,15 +205,9 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                     content: currentMessage,
                     fromUser: true,
                     createdAt: new Date().toISOString(),
-                    llmProvider: currentSelectedLLM
                 };
-                
                 setLocalMessages(prev => [...prev, tempMessage]);
                 setPendingMessageIds(prev => [...prev, tempId]);
-
-                setTimeout(() => {
-                    setLocalMessages(prev => [...prev]);
-                }, 0);
 
                 await sqlApi.optimizeQuery({
                     chatId: selectedChatId,
@@ -246,23 +217,17 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                     isMPP: isMPPEnabled
                 });
             } else {
-                const userMessage = await chatApi.sendMessage(selectedChatId, currentMessage, true);
-                setLocalMessages(prev => [...prev, userMessage]);
-                
-                setTimeout(() => {
-                    setLocalMessages(prev => [...prev]);
-                }, 0);
-
-                await chatApi.sendMessage(selectedChatId, "Пожалуйста, отправьте SQL-запрос для оптимизации", false);
+                await chatApi.sendMessage(selectedChatId, currentMessage, true);
+                await chatApi.sendMessage(selectedChatId, "Please submit SQL query for optimization", false);
             }
         } catch (err) {
-            console.error('Error sending message:', err);
             setError('Failed to send message: ' + (err instanceof Error ? err.message : 'Unknown error'));
             setLocalMessages(prev => prev.filter(msg => !msg.id.startsWith('temp_')));
+            setPendingMessageIds([]);
         } finally {
             setLoading(false);
         }
-    }, [selectedChatId, message, isSQLQuery, currentSelectedLLM, connections, isMPPEnabled]);
+    }, [message, selectedChatId, connections, currentSelectedLLM, isMPPEnabled]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -281,7 +246,7 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
         }
 
         // Проверяем, является ли сообщение ответом на SQL-запрос
-        if (message.content.includes('## Оптимизированный SQL') || message.content.includes('## Информация о запросе')) {
+        if (message.content.includes('## Информация о запросе')) {
             try {
                 const parsedResponse = parseLLMResponse(message.content);
                 
@@ -308,55 +273,6 @@ const ChatArea: React.FC<ChatAreaProps> = memo(({
                     }
                 }
 
-                // Проверяем, является ли ответ от LLM
-                if (message.content.includes('## Оптимизированный SQL') || 
-                    message.content.includes('## Пояснение') || 
-                    message.content.includes('## Оценка улучшения') || 
-                    message.content.includes('## Потенциальные риски')) {
-                    return (
-                        <div className="bg-gray-800 text-white rounded-lg p-3 max-w-[80%]">
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                                components={{
-                                    code: ({node, inline, className, children, ...props}: CodeProps) => {
-                                        const match = /language-(\w+)/.exec(className || '');
-                                        return !inline && match ? (
-                                            <SyntaxHighlighter
-                                                style={vscDarkPlus as any}
-                                                language={match[1]}
-                                                PreTag="div"
-                                                {...props}
-                                            >
-                                                {String(children).replace(/\n$/, '')}
-                                            </SyntaxHighlighter>
-                                        ) : (
-                                            <code className={className} {...props}>
-                                                {children}
-                                            </code>
-                                        );
-                                    },
-                                    h2: ({node, ...props}) => (
-                                        <h2 className="text-xl font-bold mt-4 mb-2 text-blue-400" {...props} />
-                                    ),
-                                    p: ({node, ...props}) => (
-                                        <p className="my-2" {...props} />
-                                    ),
-                                    ul: ({node, ...props}) => (
-                                        <ul className="list-disc list-inside my-2" {...props} />
-                                    ),
-                                    li: ({node, ...props}) => (
-                                        <li className="ml-4" {...props} />
-                                    )
-                                }}
-                            >
-                                {message.content}
-                            </ReactMarkdown>
-                        </div>
-                    );
-                }
-
-                // Для локальной модели используем полный вывод
                 return (
                     <OptimizedSQLResponse
                         originalQuery={parsedResponse.originalQuery}

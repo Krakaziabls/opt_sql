@@ -1,0 +1,1 @@
+ALTER TABLE messages ADD COLUMN llm_provider VARCHAR(50); 
